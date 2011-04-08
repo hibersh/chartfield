@@ -1,1 +1,7 @@
 name = ChartField
+description = CCK fieldtype for making charts
+dependencies[] = content
+dependencies[] = tablefield
+dependencies[] = libraries
+package = CCK
+core = 6.x

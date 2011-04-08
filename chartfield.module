@@ -1,0 +1,239 @@
+<?php
+// $Id
+
+/**
+ * @file
+ * ChartField core hooks and menu callbacks.
+ */
+
+/**
+ * Implementation of hook_theme().
+ */
+function chartfield_theme() {
+  return array(
+    'chartfield_chart' => array(
+      'arguments' => array(
+        'element' => NULL,
+      ),
+    ),
+    'chartfield_formatter_chart_svg' => array(
+      'arguments' => array(
+        'element' => NULL,
+      ),
+    ),
+    'chartfield_formatter_chart_png' => array(
+      'arguments' => array(
+        'element' => NULL,
+      ),
+    ),
+  );
+}
+
+/**
+ * Theme function for form display 
+ */
+function theme_chartfield_chart($element) {
+  return $element['#children']; //theme('form_element', $element, $element['#children']);
+}
+
+/**
+ * Theme function for Chart SVG display 
+ */
+function theme_chartfield_formatter_chart_svg($element) {dsm($element);
+  if (empty($element['#item'])) {
+    return '';
+  }
+  $cid = 'chart_container_' . $element['#node']->nid;
+
+  $module_path = drupal_get_path('module', 'chartfield');
+  $highcharts = libraries_get_path('highcharts', TRUE);
+  drupal_add_js($highcharts . '/js/highcharts.js');
+  drupal_add_js($highcharts . '/js/modules/exporting.js');
+
+  $tx = $element['#item']['tabledata'];
+  $th = array_shift($tx);
+  for ($i = 0; $i < count($th); $i++) {
+    $ty[$i]['name'] = $th[$i];
+    $ty[$i]['data'] = array();
+    for ($j = 0; $j < count($tx); $j++) {
+      $ty[$i]['data'][$j] = is_numeric($tx[$j][$i]) ? (float)$tx[$j][$i] : $tx[$j][$i];
+    }
+  }
+
+  $options = eval('return ' . $element['#item']['chart'] . ';');
+  foreach($options['series'] as $k => $s){
+    if(isset($s['dy'])){
+      foreach(explode(',',$s['dy']) as $i){
+        $op[$k][$i] = $ty[$i]['name'];
+        $se[$k][$i]['data'] = array_map(create_function('$a, $b, $c','$a["y"]=$b;if($c){$a["name"]=$c;}return $a;'), $s['data'], $ty[$i]['data'], array_fill(0, count($ty[$i]['data']), ($s['type']=='pie'? '' : $ty[$i]['name'])));
+        $se[$k][$i]['categories'] = $options['xAxis']['categories'];
+        if(isset($s['sort'])){
+          array_multisort($se[$k][$i]['data'], SORT_DESC, $se[$k][$i]['categories']);
+        }
+      }
+      $form[$cid][$k] = array(
+        '#type' => 'select',
+        '#title' => t($options['series'][$k]['dyname']),
+        '#options' => $op[$k],
+        '#default_value' => 1,
+        '#weight' => $k,
+        '#attributes' => array('onchange' => 'apply_series("'. $cid .'", "'. $k .'",this.value);'),
+      );
+      unset($options['series'][$k]['dyname']);
+      unset($options['series'][$k]['dy']);
+    }
+    if(isset($s['sort'])){
+      array_multisort($options['series'][$k]['data'], SORT_DESC, $options['xAxis']['categories']);
+      unset($options['series'][$k]['sort']);
+    }
+  }
+  $options['chart']['renderTo'] = $cid;
+  $options['credits'] = array('text' => 'Source: Z-Ben Advisors');
+  $wrapper_size = array('width' => '600px', 'height' => '400px');
+  if (isset($options['wrapper'])) {
+    $wrapper_size = $options['wrapper'];
+    unset($options['wrapper']);
+  } 
+  $options['colors'] = array('#002142','#7F7F7F','#BFBFBF');
+  $options['legend']['borderWidth'] = 0;
+  $options['xAxis']['tickLength'] = 0;
+  $options['plotOptions']['column']['borderWidth'] = 0;
+  $options['plotOptions']['column']['shadow'] = false;
+  $options['exporting']['url'] = 'http://export.z-ben.com';
+
+  if(arg(1) == '214') {
+    $wrapper_size = array('width' => '240px', 'height' => '300px');
+    $options['xAxis']['labels']['rotation'] = '-90';
+  }
+
+  drupal_add_js(array('charts' => array($cid => $options), 'series' => array($cid => $se)), 'setting');
+  drupal_add_js($module_path . '/chartfield.js');
+  return '<div id="' . $cid . '" style="width:' . $wrapper_size['width'] . '; height: ' . $wrapper_size['height'] . '; margin: 0 auto"></div>' . drupal_render($form);
+}
+
+/**
+ * Theme function for Chart PNG display 
+ */
+function theme_chartfield_formatter_chart_png($element) {
+  if (empty($element['#item'])) {
+    return '';
+  }
+  return '';
+}
+
+/**
+ * Implementation of CCK's hook_widget_info().
+ */
+function chartfield_widget_info() {
+  return array(
+    'chartfield_chart' => array(
+      'label' => t('Chart'),
+      'field types' => array('tablefield'),
+      'multiple values' => CONTENT_HANDLE_CORE,
+      'callbacks' => array('default value' => CONTENT_CALLBACK_CUSTOM),
+    ),
+  );
+}
+
+/*
+function chartfield_widget_settings($op, $widget) {
+  switch ($op) {
+    case 'form':
+      $form = array();
+      $form['rows'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Rows'),
+        '#default_value' => $widget['rows'] ? $widget['rows'] : 3,
+        '#required' => TRUE,
+      );
+      $form['title'] = array(
+         '#type' => 'checkboxes',
+         '#title' => t('Chart Title Options'),
+         '#options' => array('none' => t('Don\'t Allow Chart Titles'), 'default' => t('Use Node Title as Default Chart Title')),
+         '#default_value' => $widget['title'] ? $widget['title'] : array(),
+      );
+      return $form;
+
+    case 'validate':
+      if (!is_numeric($widget['rows']) || intval($widget['rows']) != $widget['rows'] || $widget['rows'] <= 0) {
+        form_set_error('rows', t('"Rows" must be a positive integer.'));
+      }
+      break;
+
+    case 'save':
+      return array('rows', 'title');
+  }
+}*/
+
+/**
+ * Implementation of hook_field_formatter_info().
+ */
+function chartfield_field_formatter_info() {
+  return array(
+    'chart_svg' => array(
+      'label' => t('Chart SVG'), 
+      'multiple values' => CONTENT_HANDLE_CORE, 
+      'field types' => array('tablefield'),
+    ),
+    'chart_png' => array(
+      'label' => t('Chart PNG'), 
+      'multiple values' => CONTENT_HANDLE_CORE, 
+      'field types' => array('tablefield'),
+    ),
+  ); 
+}
+
+/**
+ * Implementation of FAPI hook_elements().
+ */
+function chartfield_elements() {
+  return array(
+    'chartfield_chart' => array(
+      '#input' => TRUE,
+      '#columns' => array('value'), '#delta' => 0,
+      '#process' => array('chartfield_chart_process'),
+      '#value_callback' => 'chartfield_chart_value',
+    ),
+  );
+}
+
+/**
+ * Implementation of hook_widget().
+ */
+function chartfield_widget(&$form, &$form_state, $field, $items, $delta = 0) {
+  $form['#attributes']['enctype'] = 'multipart/form-data';
+  if (empty($items[$delta])) {
+    $items[$delta] = array('chart' => '',);
+  }
+
+  $element = array(
+    '#type' => $field['widget']['type'],
+    '#default_value' => isset($items[$delta]) ? $items[$delta] : NULL,
+  );
+  return $element;
+}
+      
+/**
+ * Process the tablefield
+ */
+function chartfield_chart_process($element, $edit, $form_state, $form) {
+  $tabledata = unserialize($element['#default_value']['value']) or $element['#default_value']['tablefield'];
+  $element = tablefield_process($element, $edit, $form_state, $form);
+  $field = content_fields($element['#field_name'], $element['#type_name']);
+  $element['tablefield']['chart'] = array(
+    '#title' => t('Chart Setting'),
+    '#type' => 'textarea',
+    '#size' => 5,
+    '#prefix' => '<div class="clear-block">',
+    '#suffix' => '</div>',
+    '#value' => !empty($edit['tablefield']['chart']) ? $edit['tablefield']['chart'] : $tabledata['chart'],
+  );
+  
+  return $element;
+}
+
+/**
+ * Element #value_callback function.
+ */
+function chartfield_chart_value($element, $edit = FALSE) {
+}

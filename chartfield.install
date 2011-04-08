@@ -1,0 +1,44 @@
+<?php
+// $Id
+
+/**
+* @file
+* Installation options for ChartField
+*/
+
+/*
+* Implementation of hook_install().
+*/
+function chartfield_install() {
+  drupal_load('module', 'content');
+  content_notify('install', 'chartfield');
+}
+
+/**
+* Implementation of hook_uninstall().
+*/
+function chartfield_uninstall() {
+  drupal_load('module', 'content');
+  content_notify('uninstall', 'chartfield');
+}
+
+/**
+* Implementation of hook_enable().
+*
+* Notify content module when this module is enabled.
+*/
+function chartfield_enable() {
+  drupal_load('module', 'content');
+  content_notify('enable', 'chartfield');
+}
+
+/**
+* Implementation of hook_disable().
+*
+* Notify content module when this module is disabled.
+*/
+function chartfield_disable() {
+  drupal_load('module', 'content');
+  content_notify('disable', 'chartfield');
+}
+?>
