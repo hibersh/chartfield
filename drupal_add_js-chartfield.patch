@@ -1,0 +1,4 @@
+Index: includes/common.inc
+===================================================================
+2499a2500
+>       if(strpos($var, 'function(')===0){return $var;} // keep Functions
